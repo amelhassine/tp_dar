@@ -1,44 +1,61 @@
 package ClientProcess;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
+import Shared.Operation;
+import Server.Server;
 
-public class clientprocess implements Runnable {
+import java.io.*;
+import java.net.*;
+
+public class ClientProcess implements Runnable {
     private Socket socket;
-    private int clientId;
 
-    public clientprocess(Socket socket, int clientId) {
+    public ClientProcess(Socket socket) {
         this.socket = socket;
-        this.clientId = clientId;
     }
 
     @Override
     public void run() {
-        try (
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true))
-        {
-            out.println("WELCOME! clientNumber:" + clientId + " adresse IP:" + socket.getRemoteSocketAddress());
+        try {
+            ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
 
-            String line;
-            while ((line = in.readLine()) != null) {
-                System.out.printf("Reçu du client %d: %s%n", clientId, line);
-                if ("exit".equalsIgnoreCase(line.trim())) {
-                    out.println("BYE");
-                    break;
+            out.writeObject("Bienvenue sur le serveur calculatrice !");
+            out.flush();
+
+            Object obj;
+            while ((obj = in.readObject()) != null) {
+                if (obj instanceof Operation) {
+                    Operation op = (Operation) obj;
+                    double result = calculer(op);
+
+                    Server.incrementerCompteur();
+
+                    out.writeObject("Résultat : " + result);
+                    out.flush();
                 }
-                out.println("SERVER_ECHO (client " + clientId + "): " + line);
             }
-        } catch (IOException e) {
-            System.err.println("Erreur avec client " + clientId + ": " + e.getMessage());
+
+        } catch (EOFException e) {
+            System.out.println("Client déconnecté : " + socket.getInetAddress());
+        } catch (Exception e) {
+            System.err.println("Erreur : " + e.getMessage());
         } finally {
             try {
                 socket.close();
-                System.out.println("Connexion avec client " + clientId + " fermée.");
             } catch (IOException ignore) {}
+        }
+    }
+
+    private double calculer(Operation op) {
+        double a = op.getA();
+        double b = op.getB();
+        char c = op.getOperateur();
+        switch (c) {
+            case '+': return a + b;
+            case '-': return a - b;
+            case '*': return a * b;
+            case '/': return b != 0 ? a / b : Double.NaN;
+            default: return Double.NaN;
         }
     }
 }

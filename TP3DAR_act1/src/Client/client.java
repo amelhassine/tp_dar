@@ -1,43 +1,44 @@
 package Client;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.InetSocketAddress;
-import java.net.Socket;
+import Shared.Operation;
+import java.io.*;
+import java.net.*;
+import java.util.Scanner;
 
-public class client {
+public class Client {
     public static void main(String[] args) {
         String host = "localhost";
         int port = 5000;
 
-        if (args.length >= 1) host = args[0];
-        if (args.length >= 2) port = Integer.parseInt(args[1]);
+        try (Socket socket = new Socket(host, port)) {
+            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+            ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(host, port), 5000);
-            System.out.println("Connecté à " + host + ":" + port);
+            System.out.println((String) in.readObject());
 
-            BufferedReader serverIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            PrintWriter serverOut = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader userIn = new BufferedReader(new InputStreamReader(System.in));
-            String welcome = serverIn.readLine();
-            System.out.println("Serveur: " + welcome);
+            Scanner sc = new Scanner(System.in);
 
-            String input;
             while (true) {
-                System.out.print("vous -> ");
-                input = userIn.readLine();
-                if (input == null) break;
-                serverOut.println(input);
-                String response = serverIn.readLine();
-                if (response == null) break;
-                System.out.println("Serveur: " + response);
-                if ("BYE".equals(response)) break;
+                System.out.print("Entrer le 1er nombre (ou 'exit' pour quitter) : ");
+                String input = sc.nextLine();
+                if (input.equalsIgnoreCase("exit")) break;
+
+                double a = Double.parseDouble(input);
+                System.out.print("Entrer le 2ème nombre : ");
+                double b = Double.parseDouble(sc.nextLine());
+                System.out.print("Entrer l’opération (+, -, *, /) : ");
+                char op = sc.nextLine().charAt(0);
+
+                Operation operation = new Operation(a, b, op);
+                out.writeObject(operation);
+                out.flush();
+
+                String response = (String) in.readObject();
+                System.out.println("Serveur → " + response);
             }
-        } catch (IOException e) {
-            System.err.println("Erreur client: " + e.getMessage());
+
+        } catch (Exception e) {
+            System.err.println("Erreur client : " + e.getMessage());
         }
     }
 }
